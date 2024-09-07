@@ -10,6 +10,12 @@ import com.ismailmesutmujde.kotlinretrofitcoroutine.adapter.RecyclerViewAdapter
 import com.ismailmesutmujde.kotlinretrofitcoroutine.databinding.ActivityMainBinding
 import com.ismailmesutmujde.kotlinretrofitcoroutine.model.CryptoModel
 import com.ismailmesutmujde.kotlinretrofitcoroutine.service.CryptoAPI
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -23,6 +29,11 @@ class MainActivity : AppCompatActivity(), RecyclerViewAdapter.Listener {
     private val BASE_URL = "https://raw.githubusercontent.com/"
     private var cryptoModels: ArrayList<CryptoModel>? = null
     private var recyclerViewAdapter : RecyclerViewAdapter? = null
+    private var job : Job? = null
+
+    val exceptionHandler = CoroutineExceptionHandler { coroutineContext, throwable ->
+        println("Error: ${throwable.localizedMessage}")
+    }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,6 +60,24 @@ class MainActivity : AppCompatActivity(), RecyclerViewAdapter.Listener {
             .build()
             .create(CryptoAPI::class.java)
 
+        job = CoroutineScope(Dispatchers.IO + exceptionHandler).launch {
+            val response = retrofit.getData()
+
+            withContext(Dispatchers.Main){
+                if(response.isSuccessful) {
+                    response.body()?.let {
+                        cryptoModels = ArrayList(it)
+                        cryptoModels?.let {
+                            recyclerViewAdapter = RecyclerViewAdapter(it,this@MainActivity)
+                            binding.recyclerView.adapter = recyclerViewAdapter
+                        }
+                    }
+                }
+            }
+        }
+
+
+        /*
         val call = retrofit.getData()
 
         call.enqueue(object: Callback<List<CryptoModel>> {
@@ -69,7 +98,7 @@ class MainActivity : AppCompatActivity(), RecyclerViewAdapter.Listener {
                     }
                 }
             }
-        })
+        })*/
 
 
 
@@ -81,6 +110,7 @@ class MainActivity : AppCompatActivity(), RecyclerViewAdapter.Listener {
 
     override fun onDestroy() {
         super.onDestroy()
+        job?.cancel()
     }
 
 
